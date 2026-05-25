@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Keyra Enterprise CRM — crm.keyra.ie
 
-## Getting Started
+Enterprise relationship intelligence layer for Keyra, connected to Ciright Core and Keyra persona architecture.
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router)
+- **PostgreSQL** (`keyra-auth` database, `crm_*` tables)
+- **Keyra auth** (`auth_users`, affiliates, developers)
+
+## Quick start
 
 ```bash
+cd crm-keyra
+npm install
+cp .env.local.example .env.local   # or use existing .env.local
+npm run db:migrate
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) → redirects to `/dashboard`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Database
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Default connection (`.env.local`):
 
-## Learn More
+```
+DATABASE_URL=postgresql://postgres:ciright@192.168.1.206:5432/keyra-auth
+```
 
-To learn more about Next.js, take a look at the following resources:
+Migrations live in `db/migrations/`. Seed includes demo company **Acme Telecom Group**, prospect, pipeline, and follow-up.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Personas
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Type | Access |
+|------|--------|
+| Employee | Full CRM + admin |
+| Affiliate / Developer / Authorized Rep | Scoped modules per `crm_roles` |
 
-## Deploy on Vercel
+## Documentation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- [RFP Traceability Matrix](docs/RFP_TRACEABILITY.md) — requirement → schema → route mapping
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Production auth
+
+Set `NEXT_PUBLIC_CRM_DEV_AUTH_BYPASS=false` and wire Keyra SAT session to `/api/health` or dedicated session endpoint.
