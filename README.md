@@ -28,7 +28,16 @@ Default connection (`.env.local`):
 DATABASE_URL=postgresql://postgres:ciright@192.168.1.206:5432/keyra-auth
 ```
 
-Migrations live in `db/migrations/`. Seed includes demo company **Acme Telecom Group**, prospect, pipeline, and follow-up.
+Migrations live in `db/migrations/`:
+
+| File | What it does |
+|------|----------------|
+| `001_initial_schema.sql` | Creates **all** `crm_*` tables (40+ tables) |
+| `002_seed_data.sql` | Seeds roles, phases, countries, demo **Acme Telecom Group**, prospect, pipeline, follow-up |
+
+Run once per database: `npm run db:migrate`
+
+Check data after migrate: open `/api/db-status` (JSON with row counts per table).
 
 ## Personas
 

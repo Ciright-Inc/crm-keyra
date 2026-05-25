@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { RelationshipMap } from "./relationship-map";
+import { ApiErrorPanel } from "./api-error-panel";
 
 type Company360Data = {
   company: Record<string, unknown>;
@@ -39,18 +40,44 @@ const TABS = [
 export function Company360({ companyId }: { companyId: string }) {
   const [data, setData] = useState<Company360Data | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch(`/api/companies/${companyId}`)
-      .then((r) => r.json())
-      .then((j) => j.ok && setData(j.data));
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    fetch(`/api/companies/${companyId}`, { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok || !j.ok) throw new Error(j.error ?? `Failed to load company (${r.status})`);
+        setData(j.data);
+      })
+      .catch((e) => {
+        setData(null);
+        setError(e instanceof Error ? e.message : "Request failed");
+      })
+      .finally(() => setLoading(false));
   }, [companyId]);
 
-  if (!data) {
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (loading) {
     return (
       <p className="crm-empty-state" role="status">
         Loading company intelligence…
       </p>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <ApiErrorPanel
+        title="Could not load company"
+        message={error ?? "No data returned"}
+        onRetry={load}
+      />
     );
   }
 

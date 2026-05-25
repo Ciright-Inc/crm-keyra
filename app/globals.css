@@ -40,6 +40,15 @@
   --ds-radius-pill: 9999px;
   --ds-shadow-soft: 0 4px 12px rgba(0, 0, 0, 0.04);
 
+  /* Scrollbars — designd.md §0.11 */
+  --ds-scrollbar-size: 6px;
+  --ds-scrollbar-track: var(--ds-canvas-soft);
+  --ds-scrollbar-thumb: var(--ds-hairline-strong);
+  --ds-scrollbar-thumb-hover: var(--ds-body);
+  --ds-scrollbar-track-dark: rgba(255, 255, 255, 0.06);
+  --ds-scrollbar-thumb-dark: #60646c;
+  --ds-scrollbar-thumb-dark-hover: #999999;
+
   --font-sans: var(--font-inter), Inter, -apple-system, system-ui, sans-serif;
   --font-accent: var(--font-montserrat), Montserrat, sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
@@ -136,25 +145,64 @@ body,
   font-size: 24px;
 }
 
-/* Scrollbar */
+/* —— Scrollbars (theme tokens) —— */
 .crm-scroll,
-.crm-nav {
+.crm-content,
+.crm-table-wrap,
+.crm-tabs {
   scrollbar-width: thin;
-  scrollbar-color: var(--ds-hairline-strong) var(--ds-canvas-soft);
+  scrollbar-color: var(--ds-scrollbar-thumb) var(--ds-scrollbar-track);
 }
+
+.crm-sidebar .crm-nav,
+.crm-sidebar.crm-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ds-scrollbar-thumb-dark) var(--ds-scrollbar-track-dark);
+}
+
 .crm-scroll::-webkit-scrollbar,
-.crm-nav::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.crm-content::-webkit-scrollbar,
+.crm-nav::-webkit-scrollbar,
+.crm-table-wrap::-webkit-scrollbar,
+.crm-tabs::-webkit-scrollbar {
+  width: var(--ds-scrollbar-size);
+  height: var(--ds-scrollbar-size);
 }
+
 .crm-scroll::-webkit-scrollbar-track,
-.crm-nav::-webkit-scrollbar-track {
-  background: var(--ds-canvas-soft);
+.crm-content::-webkit-scrollbar-track,
+.crm-table-wrap::-webkit-scrollbar-track,
+.crm-tabs::-webkit-scrollbar-track {
+  background: var(--ds-scrollbar-track);
 }
+
 .crm-scroll::-webkit-scrollbar-thumb,
-.crm-nav::-webkit-scrollbar-thumb {
-  background: var(--ds-hairline-strong);
+.crm-content::-webkit-scrollbar-thumb,
+.crm-table-wrap::-webkit-scrollbar-thumb,
+.crm-tabs::-webkit-scrollbar-thumb {
+  background: var(--ds-scrollbar-thumb);
   border-radius: var(--ds-radius-pill);
+}
+
+.crm-scroll::-webkit-scrollbar-thumb:hover,
+.crm-content::-webkit-scrollbar-thumb:hover,
+.crm-table-wrap::-webkit-scrollbar-thumb:hover,
+.crm-tabs::-webkit-scrollbar-thumb:hover {
+  background: var(--ds-scrollbar-thumb-hover);
+}
+
+/* Dark sidebar nav — visible thumb on #171717 */
+.crm-sidebar .crm-nav::-webkit-scrollbar-track {
+  background: var(--ds-scrollbar-track-dark);
+}
+
+.crm-sidebar .crm-nav::-webkit-scrollbar-thumb {
+  background: var(--ds-scrollbar-thumb-dark);
+  border: 1px solid var(--ds-scrollbar-track-dark);
+}
+
+.crm-sidebar .crm-nav::-webkit-scrollbar-thumb:hover {
+  background: var(--ds-scrollbar-thumb-dark-hover);
 }
 
 /* —— Buttons (designd.md §0.6) —— */

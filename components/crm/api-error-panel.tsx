@@ -21,8 +21,12 @@ export function ApiErrorPanel({ title, message, onRetry }: ApiErrorPanelProps) {
           unless you use a VPN/tunnel.
         </li>
         <li>
-          Check Railway variables, run <code>npm run db:migrate</code> on deploy, and open{" "}
-          <code>/api/health</code> in the browser to test the DB connection.
+          Run <code>npm run db:migrate</code> on the same database as <code>DATABASE_URL</code>{" "}
+          (creates all <code>crm_*</code> tables + demo seed). Check{" "}
+          <code>/api/db-status</code> for table row counts.
+        </li>
+        <li>
+          Open <code>/api/health</code> to test the connection only.
         </li>
       </ul>
       {onRetry && (
