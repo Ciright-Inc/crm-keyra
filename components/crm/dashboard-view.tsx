@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { ApiErrorPanel } from "./api-error-panel";
 import {
   BarChart,
   Bar,
@@ -36,18 +37,56 @@ const gridStroke = uiColors.hairline;
 
 export function DashboardView() {
   const [data, setData] = useState<Metrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch("/api/dashboard")
-      .then((r) => r.json())
-      .then((j) => j.ok && setData(j.data));
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    fetch("/api/dashboard", { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok || !j.ok) {
+          throw new Error(j.error ?? `Dashboard API failed (${r.status})`);
+        }
+        setData(j.data);
+      })
+      .catch((e) => {
+        setData(null);
+        setError(e instanceof Error ? e.message : "Failed to load dashboard");
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  if (!data) {
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (loading) {
     return (
       <div className="crm-empty-state" role="status">
         Loading dashboard…
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <ApiErrorPanel
+        title="Could not load dashboard"
+        message={error}
+        onRetry={load}
+      />
+    );
+  }
+
+  if (!data) {
+    return (
+      <ApiErrorPanel
+        title="No dashboard data"
+        message="The API returned an empty response."
+        onRetry={load}
+      />
     );
   }
 

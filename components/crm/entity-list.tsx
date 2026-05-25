@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { EntityConfig } from "@/lib/entities";
 import { formatDate, formatDateTime, formatCurrency } from "@/lib/utils";
+import { ApiErrorPanel } from "./api-error-panel";
 
 type EntityListProps = {
   entityKey: string;
@@ -40,22 +41,34 @@ export function EntityList({ entityKey, config, detailBasePath }: EntityListProp
   const [items, setItems] = useState<Record<string, unknown>[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setLoading(true);
+    setError(null);
     const params = new URLSearchParams({ limit: "50" });
     if (q) params.set("q", q);
-    fetch(`/api/entities/${entityKey}?${params}`)
-      .then((r) => r.json())
-      .then((j) => {
-        if (j.ok) {
-          setItems(j.data.items);
-          setTotal(j.data.total);
+    fetch(`/api/entities/${entityKey}?${params}`, { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok || !j.ok) {
+          throw new Error(j.error ?? `Failed to load ${config.label} (${r.status})`);
         }
+        setItems(j.data.items);
+        setTotal(j.data.total);
+      })
+      .catch((e) => {
+        setItems([]);
+        setTotal(0);
+        setError(e instanceof Error ? e.message : "Request failed");
       })
       .finally(() => setLoading(false));
-  }, [entityKey, q]);
+  }, [entityKey, q, config.label]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const base = detailBasePath ?? config.href;
 
@@ -71,12 +84,15 @@ export function EntityList({ entityKey, config, detailBasePath }: EntityListProp
         />
         <span className="crm-helper-text self-center">{total} records</span>
       </div>
+      {error && !loading && (
+        <ApiErrorPanel title={`Could not load ${config.label}`} message={error} onRetry={load} />
+      )}
       <div className="crm-table-wrap overflow-x-auto">
         {loading ? (
           <p className="crm-empty-state" role="status">
             Loading…
           </p>
-        ) : (
+        ) : error ? null : (
           <table className="crm-table">
             <thead>
               <tr>
