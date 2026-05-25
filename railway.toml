@@ -1,0 +1,8 @@
+[build]
+builder = "RAILPACK"
+
+[deploy]
+startCommand = "node scripts/start.mjs"
+healthcheckPath = "/api/db-status"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"

@@ -68,13 +68,28 @@ If the app stays on **“Verifying Keyra session…”** (or shows **CRM unavail
 
 **Important:** `NEXT_PUBLIC_*` variables are embedded at **`npm run build`**. After changing them in Railway, trigger a **new deploy / rebuild**, not only a restart.
 
-### Recommended start command
+### Railway setup (works with Railway Postgres)
+
+1. In Railway → **New** → **Database** → **PostgreSQL** (or use existing cloud Postgres).
+2. On the **crm-keyra** service → **Variables** → add reference:
+   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (or paste the Postgres URL)
+   - `PGSSLMODE=require`
+   - `NEXT_PUBLIC_CRM_DEV_AUTH_BYPASS=true`
+   - `RAILWAY_ENVIRONMENT=true` (Railway sets this automatically)
+3. **Redeploy** after changing `NEXT_PUBLIC_*` (rebuild required).
+4. On deploy, `scripts/start.mjs` runs migrations (`000` auth stubs → `001` schema → `002`/`003` seed) then starts Next.js on `0.0.0.0`.
+5. Verify: `/api/db-status` should show `connected: true` and non-zero `counts`.
+
+`000_auth_stubs.sql` creates minimal `auth_users` tables when Railway Postgres is empty.  
+Connecting to full **keyra-auth** on your LAN still works locally with `192.168.1.206`.
+
+### Start command
 
 ```bash
-npm run db:migrate && npm run start
+npm run start
 ```
 
-Or run migrations once manually, then `npm run start`.
+Runs migrations then `next start -H 0.0.0.0` (required for Railway networking).
 
 ### Quick fix (show the dashboard)
 
