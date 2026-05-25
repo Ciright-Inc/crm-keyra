@@ -44,3 +44,31 @@ Migrations live in `db/migrations/`. Seed includes demo company **Acme Telecom G
 ## Production auth
 
 Set `NEXT_PUBLIC_CRM_DEV_AUTH_BYPASS=false` and wire Keyra SAT session to `/api/health` or dedicated session endpoint.
+
+## Deploy on Railway
+
+If the app stays on **“Verifying Keyra session…”** (or shows **CRM unavailable**), the deploy cannot reach Postgres or auth bypass was not baked into the build.
+
+### Required variables (Railway → Variables)
+
+| Variable | Value |
+|----------|--------|
+| `DATABASE_URL` | Postgres URL **reachable from Railway** (use Railway Postgres plugin or public RDS — not `192.168.x` LAN) |
+| `PGSSLMODE` | `require` for most cloud databases |
+| `NEXT_PUBLIC_CRM_DEV_AUTH_BYPASS` | `true` for demo without Keyra login; `false` when DB + real auth are ready |
+
+**Important:** `NEXT_PUBLIC_*` variables are embedded at **`npm run build`**. After changing them in Railway, trigger a **new deploy / rebuild**, not only a restart.
+
+### Recommended start command
+
+```bash
+npm run db:migrate && npm run start
+```
+
+Or run migrations once manually, then `npm run start`.
+
+### Quick fix (show the dashboard)
+
+1. Set `NEXT_PUBLIC_CRM_DEV_AUTH_BYPASS=true`
+2. Set a valid cloud `DATABASE_URL` (or bypass still shows UI but API pages need DB)
+3. Redeploy (full build)

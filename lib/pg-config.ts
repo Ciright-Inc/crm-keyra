@@ -17,6 +17,8 @@ export function getPgPoolConfig(): PoolConfig {
   return {
     connectionString,
     max: Number(process.env.PG_POOL_MAX ?? 10),
+    connectionTimeoutMillis: Number(process.env.PG_CONNECT_TIMEOUT_MS ?? 8_000),
+    idleTimeoutMillis: 30_000,
     ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
   };
 }
