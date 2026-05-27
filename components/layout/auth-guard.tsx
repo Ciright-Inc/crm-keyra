@@ -1,26 +1,85 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
+import {
+  AUTH_BACKEND_URL,
+  type AuthSessionResponse,
+  type AuthSessionUser,
+} from "@/lib/keyra-auth";
 
 const DEV_BYPASS = process.env.NEXT_PUBLIC_CRM_DEV_AUTH_BYPASS === "true";
 const HEALTH_TIMEOUT_MS = 12_000;
 
 type AuthStatus = "loading" | "ready" | "error";
 
+type AuthSessionContextValue = {
+  hydrated: boolean;
+  user: AuthSessionUser | null;
+  refreshSession: () => Promise<AuthSessionUser | null>;
+};
+
+const AuthSessionContext = createContext<AuthSessionContextValue | undefined>(undefined);
+
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [status, setStatus] = useState<AuthStatus>(DEV_BYPASS ? "ready" : "loading");
+  const [user, setUser] = useState<AuthSessionUser | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const refreshSession = useCallback(async () => {
+    if (DEV_BYPASS) {
+      setUser(null);
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${AUTH_BACKEND_URL}/auth/session`, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+      });
+
+      const json = (await response.json()) as AuthSessionResponse;
+
+      if (response.ok && json.authenticated && json.user) {
+        setUser(json.user);
+        return json.user;
+      }
+    } catch {
+      // Ignore network errors and send the user through the shared login handoff.
+    }
+
+    setUser(null);
+    return null;
+  }, []);
 
   const verifySession = useCallback(async () => {
     if (DEV_BYPASS) {
       setStatus("ready");
+      setErrorMessage(null);
       return;
     }
 
     setStatus("loading");
     setErrorMessage(null);
+
+    const sessionUser = await refreshSession();
+    if (!sessionUser) {
+      router.replace("/login");
+      return;
+    }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
@@ -56,14 +115,23 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     } finally {
       clearTimeout(timeoutId);
     }
-  }, []);
+  }, [refreshSession, router]);
 
   useEffect(() => {
-    verifySession();
+    void verifySession();
   }, [verifySession]);
 
+  const value = useMemo(
+    () => ({
+      hydrated: status !== "loading",
+      user,
+      refreshSession,
+    }),
+    [refreshSession, status, user]
+  );
+
   if (status === "ready") {
-    return <>{children}</>;
+    return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
   }
 
   if (status === "error") {
@@ -93,7 +161,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             </li>
           </ul>
           <div style={{ display: "flex", gap: "12px", marginTop: "24px", flexWrap: "wrap" }}>
-            <button type="button" className="crm-btn-primary" onClick={() => verifySession()}>
+            <button
+              type="button"
+              className="crm-btn-primary"
+              onClick={() => void verifySession()}
+            >
               Retry
             </button>
             <button
@@ -114,4 +186,14 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       <p className="crm-auth-sub">Verifying Keyra session…</p>
     </div>
   );
+}
+
+export function useAuthSession() {
+  const context = useContext(AuthSessionContext);
+
+  if (!context) {
+    throw new Error("useAuthSession must be used within AuthGuard");
+  }
+
+  return context;
 }
