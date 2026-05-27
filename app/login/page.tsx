@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   AUTH_BACKEND_URL,
   CRM_AUTH_RETURN_PARAM,
@@ -15,13 +15,12 @@ const AUTH_RETURN_RETRY_MS = 800;
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [formMessage, setFormMessage] = useState("");
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isAuthReturn, setIsAuthReturn] = useState(false);
 
   const returnUrl = useMemo(() => buildCrmLoginReturnUrl(), []);
-  const isAuthReturn = searchParams.get(CRM_AUTH_RETURN_PARAM) === "1";
   const loginButtonLabel = isCheckingSession
     ? "Checking session..."
     : isRedirecting
@@ -30,6 +29,11 @@ export default function LoginPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const authReturn =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get(CRM_AUTH_RETURN_PARAM) === "1";
+
+    setIsAuthReturn(authReturn);
 
     async function hasAuthenticatedSession() {
       try {
@@ -56,7 +60,7 @@ export default function LoginPage() {
     }
 
     async function checkExistingSession() {
-      const deadline = isAuthReturn ? Date.now() + AUTH_RETURN_POLL_MS : Date.now();
+      const deadline = authReturn ? Date.now() + AUTH_RETURN_POLL_MS : Date.now();
 
       do {
         if (await hasAuthenticatedSession()) {
@@ -74,7 +78,7 @@ export default function LoginPage() {
       } while (!cancelled);
 
       if (!cancelled) {
-        if (isAuthReturn) {
+        if (authReturn) {
           setFormMessage(
             "Keyra sign-in finished, but CRM could not confirm the shared session yet. Try again in a moment or use the refresh button below.",
           );
@@ -88,7 +92,7 @@ export default function LoginPage() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthReturn, router]);
+  }, [router]);
 
   function handleContinueToKeyra() {
     if (!returnUrl) {
