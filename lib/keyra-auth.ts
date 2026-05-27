@@ -4,8 +4,11 @@ export const AUTH_BACKEND_URL =
 export const KEYRA_GET_STARTED_URL =
   process.env.NEXT_PUBLIC_KEYRA_GET_STARTED_URL || "https://get-started.keyra.ie";
 
+export const CRM_AUTH_RETURN_PARAM = "auth_return";
+
 const CRM_LOGIN_RETURN_URL = process.env.NEXT_PUBLIC_CRM_LOGIN_RETURN_URL || "";
-const CRM_POST_AUTH_PATH = process.env.NEXT_PUBLIC_CRM_LOGIN_POST_AUTH_PATH || "/dashboard";
+const CRM_POST_AUTH_PATH =
+  process.env.NEXT_PUBLIC_CRM_LOGIN_POST_AUTH_PATH || `/login?${CRM_AUTH_RETURN_PARAM}=1`;
 
 export type AuthSessionUser = {
   id: number;
@@ -22,15 +25,17 @@ export type AuthSessionResponse = {
 };
 
 export function buildCrmLoginReturnUrl() {
-  if (CRM_LOGIN_RETURN_URL) {
-    return CRM_LOGIN_RETURN_URL;
-  }
+  const baseUrl =
+    CRM_LOGIN_RETURN_URL || (typeof window !== "undefined" ? window.location.origin : "");
 
-  if (typeof window === "undefined") {
+  if (!baseUrl) {
     return "";
   }
 
-  return new URL(CRM_POST_AUTH_PATH, window.location.origin).toString();
+  const url = new URL(baseUrl);
+  url.pathname = "/login";
+  url.searchParams.set(CRM_AUTH_RETURN_PARAM, "1");
+  return url.toString();
 }
 
 export function buildKeyraGetStartedLoginUrl(returnTo?: string) {

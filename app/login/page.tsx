@@ -1,27 +1,37 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { MaterialIcon } from "@/components/ui/material-icon";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AUTH_BACKEND_URL,
+  CRM_AUTH_RETURN_PARAM,
   buildCrmLoginReturnUrl,
   buildKeyraGetStartedLoginUrl,
   type AuthSessionResponse,
 } from "@/lib/keyra-auth";
 
+const AUTH_RETURN_POLL_MS = 15_000;
+const AUTH_RETURN_RETRY_MS = 800;
+
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [formMessage, setFormMessage] = useState("");
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   const returnUrl = useMemo(() => buildCrmLoginReturnUrl(), []);
+  const isAuthReturn = searchParams.get(CRM_AUTH_RETURN_PARAM) === "1";
+  const loginButtonLabel = isCheckingSession
+    ? "Checking session..."
+    : isRedirecting
+      ? "Opening Keyra login..."
+      : "Continue with Keyra phone login";
 
   useEffect(() => {
     let cancelled = false;
 
-    async function checkExistingSession() {
+    async function hasAuthenticatedSession() {
       try {
         const response = await fetch(`${AUTH_BACKEND_URL}/auth/session`, {
           method: "GET",
@@ -35,15 +45,40 @@ export default function LoginPage() {
 
         const json = (await response.json()) as AuthSessionResponse;
 
-        if (!cancelled && response.ok && json.authenticated) {
-          router.replace("/dashboard");
-          return;
+        if (response.ok && json.authenticated) {
+          return true;
         }
       } catch {
         // Let the user continue to the shared Keyra login flow.
       }
 
+      return false;
+    }
+
+    async function checkExistingSession() {
+      const deadline = isAuthReturn ? Date.now() + AUTH_RETURN_POLL_MS : Date.now();
+
+      do {
+        if (await hasAuthenticatedSession()) {
+          if (!cancelled) {
+            router.replace("/dashboard");
+          }
+          return;
+        }
+
+        if (Date.now() >= deadline) {
+          break;
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, AUTH_RETURN_RETRY_MS));
+      } while (!cancelled);
+
       if (!cancelled) {
+        if (isAuthReturn) {
+          setFormMessage(
+            "Keyra sign-in finished, but CRM could not confirm the shared session yet. Try again in a moment or use the refresh button below.",
+          );
+        }
         setIsCheckingSession(false);
       }
     }
@@ -53,7 +88,7 @@ export default function LoginPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [isAuthReturn, router]);
 
   function handleContinueToKeyra() {
     if (!returnUrl) {
@@ -122,7 +157,12 @@ export default function LoginPage() {
             <div className="relative">
               <div className="inline-flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-white/12 bg-white/8 text-white">
-                  <MaterialIcon name="hub" size={20} />
+                  <div className="grid h-4 w-4 grid-cols-2 gap-[2px]">
+                    <span className="rounded-full bg-white/90" />
+                    <span className="rounded-full bg-white/60" />
+                    <span className="rounded-full bg-white/60" />
+                    <span className="rounded-full bg-white/90" />
+                  </div>
                 </div>
                 <div>
                   <p className="text-sm font-semibold tracking-[0.08em] text-white">KEYRA</p>
@@ -176,7 +216,12 @@ export default function LoginPage() {
                 <div className="mb-6 lg:hidden">
                   <div className="inline-flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-black text-white">
-                      <MaterialIcon name="hub" size={20} />
+                      <div className="grid h-4 w-4 grid-cols-2 gap-[2px]">
+                        <span className="rounded-full bg-white/90" />
+                        <span className="rounded-full bg-white/60" />
+                        <span className="rounded-full bg-white/60" />
+                        <span className="rounded-full bg-white/90" />
+                      </div>
                     </div>
                     <div>
                       <p className="text-sm font-semibold tracking-[0.08em] text-black">KEYRA</p>
@@ -209,7 +254,9 @@ export default function LoginPage() {
                     }}
                     role="alert"
                   >
-                    <MaterialIcon name="error" size={20} className="shrink-0" />
+                    <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-current text-[11px] font-semibold">
+                      !
+                    </span>
                     <span>{formMessage}</span>
                   </div>
                 ) : null}
@@ -229,7 +276,10 @@ export default function LoginPage() {
                         background: "var(--ds-surface-card)",
                       }}
                     >
-                      <MaterialIcon name="shield_lock" size={20} />
+                      <div className="relative h-4 w-4">
+                        <span className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 rounded-t-full border-2 border-[var(--ds-ink)] border-b-0" />
+                        <span className="absolute bottom-0 left-1/2 h-3 w-4 -translate-x-1/2 rounded-[4px] bg-[var(--ds-ink)]" />
+                      </div>
                     </div>
                     <div className="space-y-1.5">
                       <p className="text-sm font-semibold text-[var(--ds-ink)]">
@@ -252,15 +302,13 @@ export default function LoginPage() {
                   disabled={isCheckingSession || isRedirecting}
                   onClick={handleContinueToKeyra}
                 >
-                  <MaterialIcon
-                    name={isCheckingSession || isRedirecting ? "progress_activity" : "phone_iphone"}
-                    size={20}
-                  />
-                  {isCheckingSession
-                    ? "Checking session..."
-                    : isRedirecting
-                      ? "Opening Keyra login..."
-                      : "Continue with Keyra phone login"}
+                  <span
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/30 text-[11px] font-semibold"
+                    aria-hidden
+                  >
+                    {isCheckingSession || isRedirecting ? "..." : "P"}
+                  </span>
+                  {loginButtonLabel}
                 </button>
 
                 <button
@@ -269,7 +317,12 @@ export default function LoginPage() {
                   disabled={isCheckingSession || isRedirecting}
                   onClick={() => void handleRefreshSession()}
                 >
-                  <MaterialIcon name="refresh" size={20} />
+                  <span
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--ds-hairline-strong)] text-[11px] font-semibold"
+                    aria-hidden
+                  >
+                    R
+                  </span>
                   I already verified my phone
                 </button>
               </div>
