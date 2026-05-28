@@ -49,9 +49,9 @@ export const KEYRA_GET_STARTED_URL = resolveKeyraServiceUrl(
 );
 
 export const CRM_AUTH_RETURN_PARAM = "auth_return";
-export const AUTH_RETURN_POLL_MS = 15_000;
+export const AUTH_RETURN_POLL_MS = 30_000;
 export const AUTH_RETURN_RETRY_MS = 800;
-export const AUTH_SESSION_SYNC_MS = 5_000;
+export const AUTH_SESSION_SYNC_MS = 2_500;
 
 const CRM_LOGIN_RETURN_URL = process.env.NEXT_PUBLIC_CRM_LOGIN_RETURN_URL || "";
 const CRM_POST_AUTH_PATH =
@@ -61,6 +61,7 @@ export type AuthSessionUser = {
   id: number;
   phone: string;
   email?: string | null;
+  fullName?: string | null;
   username?: string | null;
   displayName?: string | null;
   profileComplete?: boolean;
@@ -97,13 +98,13 @@ export function getAuthUserDisplayLabel(user: AuthSessionUser | null | undefined
   const displayName = String(user?.displayName ?? "").trim();
   if (displayName) return displayName;
 
+  const fullName = String(user?.fullName ?? "").trim();
+  if (fullName) return fullName;
+
   const username = String(user?.username ?? "").trim();
   if (username) return username;
 
-  const phone = String(user?.phone ?? "").trim();
-  if (phone) return phone;
-
-  return "Keyra session";
+  return "Keyra member";
 }
 
 export async function logoutSharedKeyraSession(timeoutMs = 2000) {
