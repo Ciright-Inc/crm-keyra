@@ -31,9 +31,10 @@ function resolveKeyraServiceUrl(
 }
 
 export const AUTH_BACKEND_URL = resolveKeyraServiceUrl(
-  AUTH_PROXY_PATH,
-  AUTH_PROXY_PATH,
-  AUTH_PROXY_PATH,
+  process.env.NEXT_PUBLIC_KEYRA_AUTH_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_SIMSECURE_AUTH_BACKEND_URL,
+  PROD_AUTH_BACKEND_URL,
+  LOCAL_AUTH_BACKEND_URL,
 );
 
 export const AUTH_BACKEND_TARGET_URL = resolveKeyraServiceUrl(
@@ -41,6 +42,8 @@ export const AUTH_BACKEND_TARGET_URL = resolveKeyraServiceUrl(
   PROD_AUTH_BACKEND_URL,
   LOCAL_AUTH_BACKEND_URL,
 );
+
+export const AUTH_BACKEND_PROXY_URL = AUTH_PROXY_PATH;
 
 export const KEYRA_GET_STARTED_URL = resolveKeyraServiceUrl(
   process.env.NEXT_PUBLIC_KEYRA_GET_STARTED_URL,
