@@ -498,7 +498,7 @@ body,
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  padding: 0;
+  padding: 16px 0;
   overflow: hidden;
 }
 
@@ -512,19 +512,9 @@ body,
   margin-bottom: 8px;
 }
 
-.crm-sidebar-brand h1 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--ds-on-dark);
-  text-transform: uppercase;
-}
-
-.crm-sidebar-brand p {
-  margin: 4px 0 0;
-  font-size: 11px;
-  color: var(--ds-sidebar-label);
+.crm-sidebar-brand-link {
+  display: inline-flex;
+  align-items: center;
 }
 
 .crm-nav {

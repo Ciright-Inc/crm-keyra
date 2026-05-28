@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { KeyraLogo } from "@/components/brand/keyra-logo";
 import {
   AUTH_BACKEND_URL,
   AUTH_RETURN_POLL_MS,
@@ -209,20 +210,7 @@ function LoginPageContent() {
             }}
           >
             <div className="relative">
-              <div className="inline-flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-white/12 bg-white/8 text-white">
-                  <div className="grid h-4 w-4 grid-cols-2 gap-[2px]">
-                    <span className="rounded-full bg-white/90" />
-                    <span className="rounded-full bg-white/60" />
-                    <span className="rounded-full bg-white/60" />
-                    <span className="rounded-full bg-white/90" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold tracking-[0.08em] text-white">KEYRA</p>
-                  <p className="text-xs text-white/55">CRM Admin Console</p>
-                </div>
-              </div>
+              <KeyraLogo variant="dark" className="h-10" priority />
 
               <p className="mt-8 text-xs uppercase tracking-[0.2em] text-white/50">
                 Keyra Sign In
@@ -268,20 +256,7 @@ function LoginPageContent() {
             <div className="mx-auto flex min-h-[560px] w-full max-w-md flex-col justify-center">
               <div className="mb-8">
                 <div className="mb-6 lg:hidden">
-                  <div className="inline-flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-black text-white">
-                      <div className="grid h-4 w-4 grid-cols-2 gap-[2px]">
-                        <span className="rounded-full bg-white/90" />
-                        <span className="rounded-full bg-white/60" />
-                        <span className="rounded-full bg-white/60" />
-                        <span className="rounded-full bg-white/90" />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold tracking-[0.08em] text-black">KEYRA</p>
-                      <p className="text-xs text-[var(--ds-body)]">CRM Admin Console</p>
-                    </div>
-                  </div>
+                  <KeyraLogo variant="light" className="h-9" />
                 </div>
 
                 <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--ds-body)]">
@@ -402,20 +377,7 @@ function LoginPageFallback() {
             }}
           >
             <div className="relative">
-              <div className="inline-flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-white/12 bg-white/8 text-white">
-                  <div className="grid h-4 w-4 grid-cols-2 gap-[2px]">
-                    <span className="rounded-full bg-white/90" />
-                    <span className="rounded-full bg-white/60" />
-                    <span className="rounded-full bg-white/60" />
-                    <span className="rounded-full bg-white/90" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold tracking-[0.08em] text-white">KEYRA</p>
-                  <p className="text-xs text-white/55">CRM Admin Console</p>
-                </div>
-              </div>
+              <KeyraLogo variant="dark" className="h-10" priority />
 
               <p className="mt-8 text-xs uppercase tracking-[0.2em] text-white/50">
                 Keyra Sign In
@@ -461,20 +423,7 @@ function LoginPageFallback() {
             <div className="mx-auto flex min-h-[560px] w-full max-w-md flex-col justify-center">
               <div className="mb-8">
                 <div className="mb-6 lg:hidden">
-                  <div className="inline-flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-black text-white">
-                      <div className="grid h-4 w-4 grid-cols-2 gap-[2px]">
-                        <span className="rounded-full bg-white/90" />
-                        <span className="rounded-full bg-white/60" />
-                        <span className="rounded-full bg-white/60" />
-                        <span className="rounded-full bg-white/90" />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold tracking-[0.08em] text-black">KEYRA</p>
-                      <p className="text-xs text-[var(--ds-body)]">CRM Admin Console</p>
-                    </div>
-                  </div>
+                  <KeyraLogo variant="light" className="h-9" />
                 </div>
 
                 <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--ds-body)]">

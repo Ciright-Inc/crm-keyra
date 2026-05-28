@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
+import { KeyraLogo } from "@/components/brand/keyra-logo";
 import { NAV_ITEMS } from "@/lib/entities";
 import { cn } from "@/lib/utils";
 import { MaterialIcon } from "@/components/ui/material-icon";
@@ -118,8 +119,9 @@ export function Sidebar({
       <div className="crm-sidebar-brand shrink-0">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h1>Keyra CRM</h1>
-            <p>crm.keyra.ie</p>
+            <Link href="/dashboard" className="crm-sidebar-brand-link" aria-label="KEYRA CRM">
+              <KeyraLogo variant="dark" className="h-7" priority />
+            </Link>
           </div>
           {isDrawer && onClose && (
             <button
