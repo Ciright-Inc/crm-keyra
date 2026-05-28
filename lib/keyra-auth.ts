@@ -1,8 +1,45 @@
-export const AUTH_BACKEND_URL =
-  process.env.NEXT_PUBLIC_SIMSECURE_AUTH_BACKEND_URL || "https://auth.keyra.ie";
+const PROD_AUTH_BACKEND_URL = "https://auth.keyra.ie";
+const PROD_GET_STARTED_URL = "https://get-started.keyra.ie";
+const LOCAL_AUTH_BACKEND_URL = "http://localhost:4000";
+const LOCAL_GET_STARTED_URL = "http://localhost:5173";
 
-export const KEYRA_GET_STARTED_URL =
-  process.env.NEXT_PUBLIC_KEYRA_GET_STARTED_URL || "https://get-started.keyra.ie";
+function isLoopbackHostname(hostname: string) {
+  const normalized = hostname.toLowerCase();
+  return normalized === "localhost" || normalized === "127.0.0.1";
+}
+
+function shouldUseLocalKeyraDefaults() {
+  if (typeof window !== "undefined") {
+    return isLoopbackHostname(window.location.hostname);
+  }
+
+  return process.env.NODE_ENV !== "production";
+}
+
+function resolveKeyraServiceUrl(
+  envValue: string | undefined,
+  productionUrl: string,
+  localUrl: string,
+) {
+  const trimmed = String(envValue ?? "").trim();
+  if (trimmed) {
+    return trimmed;
+  }
+
+  return shouldUseLocalKeyraDefaults() ? localUrl : productionUrl;
+}
+
+export const AUTH_BACKEND_URL = resolveKeyraServiceUrl(
+  process.env.NEXT_PUBLIC_SIMSECURE_AUTH_BACKEND_URL,
+  PROD_AUTH_BACKEND_URL,
+  LOCAL_AUTH_BACKEND_URL,
+);
+
+export const KEYRA_GET_STARTED_URL = resolveKeyraServiceUrl(
+  process.env.NEXT_PUBLIC_KEYRA_GET_STARTED_URL,
+  PROD_GET_STARTED_URL,
+  LOCAL_GET_STARTED_URL,
+);
 
 export const CRM_AUTH_RETURN_PARAM = "auth_return";
 
@@ -25,17 +62,15 @@ export type AuthSessionResponse = {
 };
 
 export function buildCrmLoginReturnUrl() {
-  const baseUrl =
-    CRM_LOGIN_RETURN_URL || (typeof window !== "undefined" ? window.location.origin : "");
+  if (CRM_LOGIN_RETURN_URL) {
+    return CRM_LOGIN_RETURN_URL;
+  }
 
-  if (!baseUrl) {
+  if (typeof window === "undefined") {
     return "";
   }
 
-  const url = new URL(baseUrl);
-  url.pathname = "/login";
-  url.searchParams.set(CRM_AUTH_RETURN_PARAM, "1");
-  return url.toString();
+  return new URL(CRM_POST_AUTH_PATH, window.location.origin).toString();
 }
 
 export function buildKeyraGetStartedLoginUrl(returnTo?: string) {
