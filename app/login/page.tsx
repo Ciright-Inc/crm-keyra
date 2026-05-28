@@ -4,14 +4,13 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { KeyraLogo } from "@/components/brand/keyra-logo";
 import {
-  AUTH_BACKEND_URL,
   AUTH_RETURN_POLL_MS,
   AUTH_RETURN_RETRY_MS,
   AUTH_SESSION_SYNC_MS,
   CRM_AUTH_RETURN_PARAM,
   buildCrmLoginReturnUrl,
   buildKeyraGetStartedLoginUrl,
-  type AuthSessionResponse,
+  fetchSharedKeyraSession,
 } from "@/lib/keyra-auth";
 
 function LoginPageContent() {
@@ -33,27 +32,8 @@ function LoginPageContent() {
     let cancelled = false;
 
     async function hasAuthenticatedSession() {
-      try {
-        const response = await fetch(`${AUTH_BACKEND_URL}/auth/session`, {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache",
-            Pragma: "no-cache",
-          },
-        });
-
-        const json = (await response.json()) as AuthSessionResponse;
-
-        if (response.ok && json.authenticated) {
-          return true;
-        }
-      } catch {
-        // Let the user continue to the shared Keyra login flow.
-      }
-
-      return false;
+      const session = await fetchSharedKeyraSession();
+      return session.authenticated;
     }
 
     async function checkExistingSession() {
@@ -96,24 +76,9 @@ function LoginPageContent() {
       if (document.visibilityState !== "visible") return;
 
       void (async () => {
-        try {
-          const response = await fetch(`${AUTH_BACKEND_URL}/auth/session`, {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-            headers: {
-              "Cache-Control": "no-cache",
-              Pragma: "no-cache",
-            },
-          });
-
-          const json = (await response.json()) as AuthSessionResponse;
-
-          if (response.ok && json.authenticated) {
-            router.replace("/dashboard");
-          }
-        } catch {
-          // Let the visible login screen remain available if session verification fails.
+        const session = await fetchSharedKeyraSession();
+        if (session.authenticated) {
+          router.replace("/dashboard");
         }
       })();
     };
@@ -141,24 +106,9 @@ function LoginPageContent() {
       if (document.visibilityState === "visible") {
         interval = window.setInterval(() => {
           void (async () => {
-            try {
-              const response = await fetch(`${AUTH_BACKEND_URL}/auth/session`, {
-                method: "GET",
-                credentials: "include",
-                cache: "no-store",
-                headers: {
-                  "Cache-Control": "no-cache",
-                  Pragma: "no-cache",
-                },
-              });
-
-              const json = (await response.json()) as AuthSessionResponse;
-
-              if (response.ok && json.authenticated) {
-                router.replace("/dashboard");
-              }
-            } catch {
-              // Best effort only while waiting on a shared Keyra session.
+            const session = await fetchSharedKeyraSession();
+            if (session.authenticated) {
+              router.replace("/dashboard");
             }
           })();
         }, AUTH_SESSION_SYNC_MS);

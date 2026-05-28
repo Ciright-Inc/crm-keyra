@@ -44,6 +44,8 @@ export const AUTH_BACKEND_TARGET_URL = resolveKeyraServiceUrl(
 );
 
 export const AUTH_BACKEND_PROXY_URL = AUTH_PROXY_PATH;
+export const AUTH_SESSION_ENDPOINT = `${AUTH_BACKEND_PROXY_URL}/auth/session`;
+export const AUTH_LOGOUT_ENDPOINT = `${AUTH_BACKEND_PROXY_URL}/auth/logout`;
 
 export const KEYRA_GET_STARTED_URL = resolveKeyraServiceUrl(
   process.env.NEXT_PUBLIC_KEYRA_GET_STARTED_URL,
@@ -75,6 +77,125 @@ export type AuthSessionResponse = {
   user: AuthSessionUser | null;
 };
 
+type RawAuthSessionUser = Partial<AuthSessionUser> & {
+  phone_e164?: string | null;
+  full_name?: string | null;
+  display_name?: string | null;
+  user_name?: string | null;
+  preferred_username?: string | null;
+  name?: string | null;
+  givenName?: string | null;
+  familyName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  given_name?: string | null;
+  family_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  profile?: Partial<AuthSessionUser> & {
+    phone_e164?: string | null;
+    full_name?: string | null;
+    display_name?: string | null;
+    user_name?: string | null;
+    preferred_username?: string | null;
+    name?: string | null;
+    givenName?: string | null;
+    familyName?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    given_name?: string | null;
+    family_name?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+  };
+};
+
+function pickTrimmedValue(...values: Array<string | number | null | undefined>) {
+  for (const value of values) {
+    const trimmed = String(value ?? "").trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+
+  return "";
+}
+
+function buildFullName(...parts: Array<string | null | undefined>) {
+  const trimmedParts = parts
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean);
+  return trimmedParts.join(" ");
+}
+
+function collectRawAuthSessionUsers(user: RawAuthSessionUser) {
+  const sources = [user];
+
+  if (user.profile && typeof user.profile === "object") {
+    sources.push(user.profile);
+  }
+
+  return sources;
+}
+
+export function normalizeAuthSessionUser(user: unknown): AuthSessionUser | null {
+  if (!user || typeof user !== "object") {
+    return null;
+  }
+
+  const raw = user as RawAuthSessionUser;
+  const sources = collectRawAuthSessionUsers(raw);
+  const id = Number(raw.id);
+  const phone = pickTrimmedValue(...sources.flatMap((source) => [source.phone, source.phone_e164]));
+
+  if (!Number.isFinite(id) || !phone) {
+    return null;
+  }
+
+  const displayName = pickTrimmedValue(
+    ...sources.flatMap((source) => [source.displayName, source.display_name, source.name]),
+  );
+  const fullName = pickTrimmedValue(
+    ...sources.flatMap((source) => [
+      source.fullName,
+      source.full_name,
+      buildFullName(source.givenName, source.familyName),
+      buildFullName(source.given_name, source.family_name),
+      buildFullName(source.firstName, source.lastName),
+      buildFullName(source.first_name, source.last_name),
+    ]),
+  );
+  const username = pickTrimmedValue(
+    ...sources.flatMap((source) => [source.username, source.user_name, source.preferred_username]),
+  );
+  const email = pickTrimmedValue(...sources.map((source) => source.email));
+
+  return {
+    id,
+    phone,
+    displayName: displayName || null,
+    fullName: fullName || null,
+    username: username || null,
+    email: email || null,
+    profileComplete: typeof raw.profileComplete === "boolean" ? raw.profileComplete : undefined,
+  };
+}
+
+export function normalizeAuthSessionResponse(payload: unknown): AuthSessionResponse {
+  if (!payload || typeof payload !== "object") {
+    return { authenticated: false, user: null };
+  }
+
+  const raw = payload as { authenticated?: unknown; user?: unknown };
+  const user = normalizeAuthSessionUser(raw.user);
+  const authenticated = Boolean(raw.authenticated) && Boolean(user);
+
+  return {
+    authenticated,
+    user: authenticated ? user : null,
+  };
+}
+
 export function buildCrmLoginReturnUrl() {
   if (CRM_LOGIN_RETURN_URL) {
     return CRM_LOGIN_RETURN_URL;
@@ -97,6 +218,32 @@ export function buildKeyraGetStartedLoginUrl(returnTo?: string) {
   return url.toString();
 }
 
+export async function fetchSharedKeyraSession() {
+  try {
+    const response = await fetch(AUTH_SESSION_ENDPOINT, {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+    });
+
+    const json = normalizeAuthSessionResponse((await response.json()) as AuthSessionResponse);
+    if (response.ok && json.authenticated && json.user) {
+      return json;
+    }
+  } catch {
+    // Let the caller decide whether to retry or redirect.
+  }
+
+  return {
+    authenticated: false,
+    user: null,
+  } satisfies AuthSessionResponse;
+}
+
 export function getAuthUserDisplayLabel(user: AuthSessionUser | null | undefined) {
   const displayName = String(user?.displayName ?? "").trim();
   if (displayName) return displayName;
@@ -107,15 +254,40 @@ export function getAuthUserDisplayLabel(user: AuthSessionUser | null | undefined
   const username = String(user?.username ?? "").trim();
   if (username) return username;
 
+  const email = String(user?.email ?? "").trim();
+  if (email) return email;
+
+  const phone = String(user?.phone ?? "").trim();
+  if (phone) return phone;
+
   return "Keyra member";
 }
 
-export async function logoutSharedKeyraSession(timeoutMs = 2000) {
+async function waitForSharedKeyraSessionLogout(timeoutMs: number, retryMs = 250) {
+  const deadline = Date.now() + timeoutMs;
+
+  do {
+    const session = await fetchSharedKeyraSession();
+    if (!session.authenticated) {
+      return true;
+    }
+
+    if (Date.now() >= deadline) {
+      break;
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, retryMs));
+  } while (true);
+
+  return false;
+}
+
+export async function logoutSharedKeyraSession(timeoutMs = 4000) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    await fetch(`${AUTH_BACKEND_URL}/auth/logout`, {
+    await fetch(AUTH_LOGOUT_ENDPOINT, {
       method: "POST",
       credentials: "include",
       keepalive: true,
@@ -126,4 +298,6 @@ export async function logoutSharedKeyraSession(timeoutMs = 2000) {
   } finally {
     window.clearTimeout(timer);
   }
+
+  return waitForSharedKeyraSessionLogout(Math.max(timeoutMs, 1500));
 }

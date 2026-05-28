@@ -10,10 +10,9 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import {
-  AUTH_BACKEND_URL,
   AUTH_SESSION_SYNC_MS,
-  type AuthSessionResponse,
   type AuthSessionUser,
+  fetchSharedKeyraSession,
 } from "@/lib/keyra-auth";
 
 const DEV_BYPASS = process.env.NEXT_PUBLIC_CRM_DEV_AUTH_BYPASS === "true";
@@ -41,25 +40,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       return null;
     }
 
-    try {
-      const response = await fetch(`${AUTH_BACKEND_URL}/auth/session`, {
-        method: "GET",
-        credentials: "include",
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-        },
-      });
-
-      const json = (await response.json()) as AuthSessionResponse;
-
-      if (response.ok && json.authenticated && json.user) {
-        setUser(json.user);
-        return json.user;
-      }
-    } catch {
-      // Ignore network errors and send the user through the shared login handoff.
+    const session = await fetchSharedKeyraSession();
+    if (session.authenticated && session.user) {
+      setUser(session.user);
+      return session.user;
     }
 
     setUser(null);

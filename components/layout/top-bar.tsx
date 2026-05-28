@@ -36,12 +36,14 @@ export function TopBar({ menuOpen = false, onMenuToggle }: TopBarProps) {
       "appSessionLogId",
     ].forEach((key) => localStorage.removeItem(key));
 
-    await logoutSharedKeyraSession();
+    const sharedSessionCleared = await logoutSharedKeyraSession();
 
-    toast.success("Logged out successfully");
-    router.replace("/login");
-    router.refresh();
-    setLoggingOut(false);
+    toast.success(
+      sharedSessionCleared
+        ? "Logged out successfully"
+        : "Logged out. Shared session is still clearing.",
+    );
+    window.location.replace("/login");
   }
 
   const userLabel = getAuthUserDisplayLabel(user);
