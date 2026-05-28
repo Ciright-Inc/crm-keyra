@@ -2,6 +2,7 @@ const PROD_AUTH_BACKEND_URL = "https://auth.keyra.ie";
 const PROD_GET_STARTED_URL = "https://get-started.keyra.ie";
 const LOCAL_AUTH_BACKEND_URL = "http://localhost:4000";
 const LOCAL_GET_STARTED_URL = "http://localhost:5173";
+const AUTH_PROXY_PATH = "/api/keyra-auth";
 
 function isLoopbackHostname(hostname: string) {
   const normalized = hostname.toLowerCase();
@@ -30,7 +31,13 @@ function resolveKeyraServiceUrl(
 }
 
 export const AUTH_BACKEND_URL = resolveKeyraServiceUrl(
-  process.env.NEXT_PUBLIC_SIMSECURE_AUTH_BACKEND_URL,
+  AUTH_PROXY_PATH,
+  AUTH_PROXY_PATH,
+  AUTH_PROXY_PATH,
+);
+
+export const AUTH_BACKEND_TARGET_URL = resolveKeyraServiceUrl(
+  process.env.KEYRA_AUTH_BACKEND_URL || process.env.NEXT_PUBLIC_SIMSECURE_AUTH_BACKEND_URL,
   PROD_AUTH_BACKEND_URL,
   LOCAL_AUTH_BACKEND_URL,
 );

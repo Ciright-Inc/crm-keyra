@@ -19,6 +19,11 @@ export const metadata: Metadata = {
   title: "Keyra CRM | crm.keyra.ie",
   description:
     "Enterprise relationship intelligence — prospecting, pipeline, revenue, commission, Ciright Core sync",
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
 };
 
 export default function RootLayout({
