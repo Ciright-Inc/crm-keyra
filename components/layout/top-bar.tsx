@@ -5,7 +5,7 @@ import { useState } from "react";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { toast } from "sonner";
 import { useAuthSession } from "./auth-guard";
-import { AUTH_BACKEND_URL, getAuthUserDisplayLabel } from "@/lib/keyra-auth";
+import { getAuthUserDisplayLabel, logoutSharedKeyraSession } from "@/lib/keyra-auth";
 
 type TopBarProps = {
   menuOpen?: boolean;
@@ -36,14 +36,7 @@ export function TopBar({ menuOpen = false, onMenuToggle }: TopBarProps) {
       "appSessionLogId",
     ].forEach((key) => localStorage.removeItem(key));
 
-    try {
-      await fetch(`${AUTH_BACKEND_URL}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch {
-      // Ignore network errors and continue clearing the local session state.
-    }
+    await logoutSharedKeyraSession();
 
     toast.success("Logged out successfully");
     router.replace("/login");

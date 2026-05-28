@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import {
   AUTH_BACKEND_URL,
+  AUTH_SESSION_SYNC_MS,
   type AuthSessionResponse,
   type AuthSessionUser,
 } from "@/lib/keyra-auth";
@@ -118,8 +119,75 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }, [refreshSession, router]);
 
   useEffect(() => {
-    void verifySession();
+    const timer = window.setTimeout(() => {
+      void verifySession();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [verifySession]);
+
+  useEffect(() => {
+    if (DEV_BYPASS) return;
+
+    const refreshOnReturn = () => {
+      if (document.visibilityState !== "visible") return;
+
+      void refreshSession().then((sessionUser) => {
+        if (!sessionUser) {
+          setErrorMessage(null);
+          setStatus("loading");
+          router.replace("/login");
+        }
+      });
+    };
+
+    window.addEventListener("focus", refreshOnReturn);
+    window.addEventListener("pageshow", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshOnReturn);
+
+    return () => {
+      window.removeEventListener("focus", refreshOnReturn);
+      window.removeEventListener("pageshow", refreshOnReturn);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+    };
+  }, [refreshSession, router]);
+
+  useEffect(() => {
+    if (DEV_BYPASS) return;
+
+    let interval: ReturnType<typeof window.setInterval> | undefined;
+
+    const scheduleSync = () => {
+      if (interval) {
+        window.clearInterval(interval);
+        interval = undefined;
+      }
+
+      if (document.visibilityState === "visible") {
+        interval = window.setInterval(() => {
+          void refreshSession().then((sessionUser) => {
+            if (!sessionUser) {
+              setErrorMessage(null);
+              setStatus("loading");
+              router.replace("/login");
+            }
+          });
+        }, AUTH_SESSION_SYNC_MS);
+      }
+    };
+
+    scheduleSync();
+    document.addEventListener("visibilitychange", scheduleSync);
+
+    return () => {
+      if (interval) {
+        window.clearInterval(interval);
+      }
+      document.removeEventListener("visibilitychange", scheduleSync);
+    };
+  }, [refreshSession, router]);
 
   const value = useMemo(
     () => ({

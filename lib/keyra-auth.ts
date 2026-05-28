@@ -42,6 +42,9 @@ export const KEYRA_GET_STARTED_URL = resolveKeyraServiceUrl(
 );
 
 export const CRM_AUTH_RETURN_PARAM = "auth_return";
+export const AUTH_RETURN_POLL_MS = 15_000;
+export const AUTH_RETURN_RETRY_MS = 800;
+export const AUTH_SESSION_SYNC_MS = 5_000;
 
 const CRM_LOGIN_RETURN_URL = process.env.NEXT_PUBLIC_CRM_LOGIN_RETURN_URL || "";
 const CRM_POST_AUTH_PATH =
@@ -94,4 +97,22 @@ export function getAuthUserDisplayLabel(user: AuthSessionUser | null | undefined
   if (phone) return phone;
 
   return "Keyra session";
+}
+
+export async function logoutSharedKeyraSession(timeoutMs = 2000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    await fetch(`${AUTH_BACKEND_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      keepalive: true,
+      signal: controller.signal,
+    });
+  } catch {
+    // Best effort only. Local navigation should not be blocked by a slow auth backend.
+  } finally {
+    window.clearTimeout(timer);
+  }
 }

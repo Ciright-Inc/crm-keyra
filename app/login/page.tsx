@@ -1,26 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AUTH_BACKEND_URL,
+  AUTH_RETURN_POLL_MS,
+  AUTH_RETURN_RETRY_MS,
+  AUTH_SESSION_SYNC_MS,
   CRM_AUTH_RETURN_PARAM,
   buildCrmLoginReturnUrl,
   buildKeyraGetStartedLoginUrl,
   type AuthSessionResponse,
 } from "@/lib/keyra-auth";
 
-const AUTH_RETURN_POLL_MS = 15_000;
-const AUTH_RETURN_RETRY_MS = 800;
-
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [formMessage, setFormMessage] = useState("");
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const [isAuthReturn, setIsAuthReturn] = useState(false);
 
   const returnUrl = useMemo(() => buildCrmLoginReturnUrl(), []);
+  const isAuthReturn = searchParams.get(CRM_AUTH_RETURN_PARAM) === "1";
   const loginButtonLabel = isCheckingSession
     ? "Checking session..."
     : isRedirecting
@@ -29,11 +30,6 @@ export default function LoginPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const authReturn =
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get(CRM_AUTH_RETURN_PARAM) === "1";
-
-    setIsAuthReturn(authReturn);
 
     async function hasAuthenticatedSession() {
       try {
@@ -60,7 +56,7 @@ export default function LoginPage() {
     }
 
     async function checkExistingSession() {
-      const deadline = authReturn ? Date.now() + AUTH_RETURN_POLL_MS : Date.now();
+      const deadline = isAuthReturn ? Date.now() + AUTH_RETURN_POLL_MS : Date.now();
 
       do {
         if (await hasAuthenticatedSession()) {
@@ -78,7 +74,7 @@ export default function LoginPage() {
       } while (!cancelled);
 
       if (!cancelled) {
-        if (authReturn) {
+        if (isAuthReturn) {
           setFormMessage(
             "Keyra sign-in finished, but CRM could not confirm the shared session yet. Try again in a moment or use the refresh button below.",
           );
@@ -92,6 +88,91 @@ export default function LoginPage() {
     return () => {
       cancelled = true;
     };
+  }, [isAuthReturn, router]);
+
+  useEffect(() => {
+    const refreshOnReturn = () => {
+      if (document.visibilityState !== "visible") return;
+
+      void (async () => {
+        try {
+          const response = await fetch(`${AUTH_BACKEND_URL}/auth/session`, {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              "Cache-Control": "no-cache",
+              Pragma: "no-cache",
+            },
+          });
+
+          const json = (await response.json()) as AuthSessionResponse;
+
+          if (response.ok && json.authenticated) {
+            router.replace("/dashboard");
+          }
+        } catch {
+          // Let the visible login screen remain available if session verification fails.
+        }
+      })();
+    };
+
+    window.addEventListener("focus", refreshOnReturn);
+    window.addEventListener("pageshow", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshOnReturn);
+
+    return () => {
+      window.removeEventListener("focus", refreshOnReturn);
+      window.removeEventListener("pageshow", refreshOnReturn);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+    };
+  }, [router]);
+
+  useEffect(() => {
+    let interval: ReturnType<typeof window.setInterval> | undefined;
+
+    const scheduleSync = () => {
+      if (interval) {
+        window.clearInterval(interval);
+        interval = undefined;
+      }
+
+      if (document.visibilityState === "visible") {
+        interval = window.setInterval(() => {
+          void (async () => {
+            try {
+              const response = await fetch(`${AUTH_BACKEND_URL}/auth/session`, {
+                method: "GET",
+                credentials: "include",
+                cache: "no-store",
+                headers: {
+                  "Cache-Control": "no-cache",
+                  Pragma: "no-cache",
+                },
+              });
+
+              const json = (await response.json()) as AuthSessionResponse;
+
+              if (response.ok && json.authenticated) {
+                router.replace("/dashboard");
+              }
+            } catch {
+              // Best effort only while waiting on a shared Keyra session.
+            }
+          })();
+        }, AUTH_SESSION_SYNC_MS);
+      }
+    };
+
+    scheduleSync();
+    document.addEventListener("visibilitychange", scheduleSync);
+
+    return () => {
+      if (interval) {
+        window.clearInterval(interval);
+      }
+      document.removeEventListener("visibilitychange", scheduleSync);
+    };
   }, [router]);
 
   function handleContinueToKeyra() {
@@ -103,37 +184,6 @@ export default function LoginPage() {
     setFormMessage("");
     setIsRedirecting(true);
     window.location.assign(buildKeyraGetStartedLoginUrl(returnUrl));
-  }
-
-  async function handleRefreshSession() {
-    setFormMessage("");
-    setIsCheckingSession(true);
-
-    try {
-      const response = await fetch(`${AUTH_BACKEND_URL}/auth/session`, {
-        method: "GET",
-        credentials: "include",
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-        },
-      });
-
-      const json = (await response.json()) as AuthSessionResponse;
-
-      if (response.ok && json.authenticated) {
-        router.replace("/dashboard");
-        return;
-      }
-
-      setFormMessage("No active Keyra session found yet. Finish phone verification first.");
-    } catch {
-      setFormMessage("Unable to verify your Keyra session right now. Please try again.");
-    } finally {
-      setIsCheckingSession(false);
-      setIsRedirecting(false);
-    }
   }
 
   return (
@@ -313,21 +363,6 @@ export default function LoginPage() {
                     {isCheckingSession || isRedirecting ? "..." : "P"}
                   </span>
                   {loginButtonLabel}
-                </button>
-
-                <button
-                  type="button"
-                  className="crm-btn w-full"
-                  disabled={isCheckingSession || isRedirecting}
-                  onClick={() => void handleRefreshSession()}
-                >
-                  <span
-                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--ds-hairline-strong)] text-[11px] font-semibold"
-                    aria-hidden
-                  >
-                    R
-                  </span>
-                  I already verified my phone
                 </button>
               </div>
 
