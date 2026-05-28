@@ -157,7 +157,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (DEV_BYPASS) return;
 
-    let interval: ReturnType<typeof window.setInterval> | undefined;
+    let interval: number | undefined;
 
     const scheduleSync = () => {
       if (interval) {
