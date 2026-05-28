@@ -44,8 +44,8 @@ export const AUTH_BACKEND_TARGET_URL = resolveKeyraServiceUrl(
 );
 
 export const AUTH_BACKEND_PROXY_URL = AUTH_PROXY_PATH;
-export const AUTH_SESSION_ENDPOINT = `${AUTH_BACKEND_PROXY_URL}/auth/session`;
-export const AUTH_LOGOUT_ENDPOINT = `${AUTH_BACKEND_PROXY_URL}/auth/logout`;
+export const AUTH_SESSION_ENDPOINT = `${AUTH_BACKEND_URL}/auth/session`;
+export const AUTH_LOGOUT_ENDPOINT = `${AUTH_BACKEND_URL}/auth/logout`;
 
 export const KEYRA_GET_STARTED_URL = resolveKeyraServiceUrl(
   process.env.NEXT_PUBLIC_KEYRA_GET_STARTED_URL,
@@ -57,6 +57,7 @@ export const CRM_AUTH_RETURN_PARAM = "auth_return";
 export const AUTH_RETURN_POLL_MS = 30_000;
 export const AUTH_RETURN_RETRY_MS = 800;
 export const AUTH_SESSION_SYNC_MS = 2_500;
+const AUTH_SESSION_TIMEOUT_MS = 12_000;
 
 const CRM_LOGIN_RETURN_URL = process.env.NEXT_PUBLIC_CRM_LOGIN_RETURN_URL || "";
 const CRM_POST_AUTH_PATH =
@@ -219,11 +220,15 @@ export function buildKeyraGetStartedLoginUrl(returnTo?: string) {
 }
 
 export async function fetchSharedKeyraSession() {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), AUTH_SESSION_TIMEOUT_MS);
+
   try {
     const response = await fetch(AUTH_SESSION_ENDPOINT, {
       method: "GET",
       credentials: "include",
       cache: "no-store",
+      signal: controller.signal,
       headers: {
         "Cache-Control": "no-cache",
         Pragma: "no-cache",
@@ -236,6 +241,8 @@ export async function fetchSharedKeyraSession() {
     }
   } catch {
     // Let the caller decide whether to retry or redirect.
+  } finally {
+    window.clearTimeout(timeout);
   }
 
   return {
