@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import {
   AUTH_SESSION_SYNC_MS,
+  KEYRA_AUTH_BROADCAST_CHANNEL,
   type AuthSessionUser,
   fetchSharedKeyraSession,
 } from "@/lib/keyra-auth";
@@ -35,11 +36,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const refreshSession = useCallback(async () => {
-    if (DEV_BYPASS) {
-      setUser(null);
-      return null;
-    }
-
     const session = await fetchSharedKeyraSession();
     if (session.authenticated && session.user) {
       setUser(session.user);
@@ -50,10 +46,24 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     return null;
   }, []);
 
+  const redirectToLogin = useCallback(() => {
+    setErrorMessage(null);
+    setStatus("loading");
+    window.location.replace("/login");
+  }, []);
+
+  const handleSharedSessionLost = useCallback(() => {
+    setUser(null);
+    if (!DEV_BYPASS) {
+      redirectToLogin();
+    }
+  }, [redirectToLogin]);
+
   const verifySession = useCallback(async () => {
     if (DEV_BYPASS) {
       setStatus("ready");
       setErrorMessage(null);
+      void refreshSession();
       return;
     }
 
@@ -115,14 +125,29 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (DEV_BYPASS) return;
 
+    let channel: BroadcastChannel | undefined;
+
+    try {
+      channel = new BroadcastChannel(KEYRA_AUTH_BROADCAST_CHANNEL);
+      channel.onmessage = (event) => {
+        if (event?.data?.type === "logout") {
+          handleSharedSessionLost();
+        }
+      };
+    } catch {
+      // BroadcastChannel not supported
+    }
+
+    return () => channel?.close();
+  }, [handleSharedSessionLost]);
+
+  useEffect(() => {
     const refreshOnReturn = () => {
       if (document.visibilityState !== "visible") return;
 
       void refreshSession().then((sessionUser) => {
         if (!sessionUser) {
-          setErrorMessage(null);
-          setStatus("loading");
-          router.replace("/login");
+          handleSharedSessionLost();
         }
       });
     };
@@ -136,11 +161,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       window.removeEventListener("pageshow", refreshOnReturn);
       document.removeEventListener("visibilitychange", refreshOnReturn);
     };
-  }, [refreshSession, router]);
+  }, [handleSharedSessionLost, refreshSession]);
 
   useEffect(() => {
-    if (DEV_BYPASS) return;
-
     let interval: number | undefined;
 
     const scheduleSync = () => {
@@ -153,9 +176,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         interval = window.setInterval(() => {
           void refreshSession().then((sessionUser) => {
             if (!sessionUser) {
-              setErrorMessage(null);
-              setStatus("loading");
-              router.replace("/login");
+              handleSharedSessionLost();
             }
           });
         }, AUTH_SESSION_SYNC_MS);
@@ -171,7 +192,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       }
       document.removeEventListener("visibilitychange", scheduleSync);
     };
-  }, [refreshSession, router]);
+  }, [handleSharedSessionLost, refreshSession]);
 
   const value = useMemo(
     () => ({

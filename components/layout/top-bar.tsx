@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { toast } from "sonner";
 import { useAuthSession } from "./auth-guard";
@@ -15,9 +15,15 @@ type TopBarProps = {
 
 export function TopBar({ menuOpen = false, onMenuToggle }: TopBarProps) {
   const router = useRouter();
-  const { user } = useAuthSession();
+  const { user, refreshSession } = useAuthSession();
   const [q, setQ] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      void refreshSession();
+    }
+  }, [refreshSession, user]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();

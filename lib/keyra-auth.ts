@@ -139,6 +139,7 @@ export const CRM_AUTH_RETURN_PARAM = "auth_return";
 export const AUTH_RETURN_POLL_MS = 30_000;
 export const AUTH_RETURN_RETRY_MS = 800;
 export const AUTH_SESSION_SYNC_MS = 2_500;
+export const KEYRA_AUTH_BROADCAST_CHANNEL = "simsecure-auth";
 const AUTH_SESSION_TIMEOUT_MS = 12_000;
 
 const CRM_LOGIN_RETURN_URL = process.env.NEXT_PUBLIC_CRM_LOGIN_RETURN_URL || "";
@@ -315,23 +316,15 @@ export function buildKeyraGetStartedLoginUrl(returnTo?: string) {
   return url.toString();
 }
 
-async function ensureCrossSiteCookieAccess() {
-  if (typeof window === "undefined" || typeof document === "undefined") {
-    return;
-  }
-
-  if (!isCrossSiteKeyraHost(window.location.hostname)) {
-    return;
-  }
-
-  if (typeof document.requestStorageAccess !== "function") {
+export function broadcastKeyraLogout() {
+  if (typeof window === "undefined") {
     return;
   }
 
   try {
-    await document.requestStorageAccess();
+    new BroadcastChannel(KEYRA_AUTH_BROADCAST_CHANNEL)?.postMessage({ type: "logout" });
   } catch {
-    // Browser denied or feature unavailable — continue with credentialed fetch.
+    // BroadcastChannel not supported
   }
 }
 
@@ -340,8 +333,6 @@ export async function fetchSharedKeyraSession() {
   const timeout = window.setTimeout(() => controller.abort(), AUTH_SESSION_TIMEOUT_MS);
 
   try {
-    await ensureCrossSiteCookieAccess();
-
     const response = await fetch(authSessionEndpoint(), {
       method: "GET",
       credentials: "include",
@@ -424,8 +415,6 @@ export async function logoutSharedKeyraSession(timeoutMs = 4000) {
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    await ensureCrossSiteCookieAccess();
-
     await fetch(authLogoutEndpoint(), {
       method: "POST",
       credentials: "include",
@@ -437,6 +426,8 @@ export async function logoutSharedKeyraSession(timeoutMs = 4000) {
   } finally {
     window.clearTimeout(timer);
   }
+
+  broadcastKeyraLogout();
 
   return waitForSharedKeyraSessionLogout(Math.max(timeoutMs, 1500));
 }
