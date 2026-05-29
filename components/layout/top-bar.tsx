@@ -5,7 +5,8 @@ import { useState } from "react";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { toast } from "sonner";
 import { useAuthSession } from "./auth-guard";
-import { getAuthUserDisplayLabel, logoutSharedKeyraSession } from "@/lib/keyra-auth";
+import { logoutSharedKeyraSession } from "@/lib/keyra-auth";
+import { TopBarUserChip } from "./top-bar-user-chip";
 
 type TopBarProps = {
   menuOpen?: boolean;
@@ -46,8 +47,6 @@ export function TopBar({ menuOpen = false, onMenuToggle }: TopBarProps) {
     window.location.replace("/login");
   }
 
-  const userLabel = getAuthUserDisplayLabel(user);
-
   return (
     <header className="crm-topbar">
       <button
@@ -71,10 +70,7 @@ export function TopBar({ menuOpen = false, onMenuToggle }: TopBarProps) {
         />
       </form>
       <div className="ml-auto flex items-center gap-3">
-        <div className="hidden text-right sm:block">
-          <p className="text-sm text-[var(--ds-ink)]">{userLabel}</p>
-          <p className="crm-topbar-meta">{user?.phone ? "Verified phone access" : "Shared Keyra session"}</p>
-        </div>
+        <TopBarUserChip user={user} />
         <button
           type="button"
           className="crm-btn"

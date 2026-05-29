@@ -54,6 +54,23 @@ Check data after migrate: open `/api/db-status` (JSON with row counts per table)
 
 Set `NEXT_PUBLIC_CRM_DEV_AUTH_BYPASS=false` and wire Keyra SAT session to `/api/health` or dedicated session endpoint.
 
+### Railway URL (before custom domain)
+
+Use [https://crm-keyra-production.up.railway.app/login](https://crm-keyra-production.up.railway.app/login) until `crm.keyra.ie` is attached.
+
+Railway runs on a **different domain** than `.keyra.ie`, so the shared session cookie is read via **cross-site** calls to `https://auth.keyra.ie` (not the `/api/keyra-auth` proxy). See `railway.env.example`.
+
+| Variable | Railway value |
+|----------|----------------|
+| `NEXT_PUBLIC_CRM_DEV_AUTH_BYPASS` | `false` |
+| `KEYRA_AUTH_BACKEND_URL` | `https://auth.keyra.ie` (server proxy upstream only) |
+| `NEXT_PUBLIC_CRM_LOGIN_RETURN_URL` | `https://crm-keyra-production.up.railway.app/login?auth_return=1` |
+| `NEXT_PUBLIC_KEYRA_GET_STARTED_URL` | `https://get-started.keyra.ie` |
+
+Do **not** set `NEXT_PUBLIC_SIMSECURE_AUTH_BACKEND_URL=/api/keyra-auth` on Railway.
+
+When `crm.keyra.ie` is live, remove `NEXT_PUBLIC_CRM_LOGIN_RETURN_URL` (origin auto-detected) and the app will use the same-origin `/api/keyra-auth` proxy automatically.
+
 ## Deploy on Railway
 
 If the app stays on **“Verifying Keyra session…”** (or shows **CRM unavailable**), the deploy cannot reach Postgres or auth bypass was not baked into the build.
@@ -64,11 +81,14 @@ If the app stays on **“Verifying Keyra session…”** (or shows **CRM unavail
 |----------|--------|
 | `DATABASE_URL` | Postgres URL **reachable from Railway** (use Railway Postgres plugin or public RDS — not `192.168.x` LAN) |
 | `PGSSLMODE` | `require` for most cloud databases |
-| `NEXT_PUBLIC_CRM_DEV_AUTH_BYPASS` | `true` for demo without Keyra login; `false` when DB + real auth are ready |
-| `KEYRA_AUTH_BACKEND_URL` | `https://auth.keyra.ie` (recommended upstream for the built-in `/api/keyra-auth` proxy) |
-| `NEXT_PUBLIC_SIMSECURE_AUTH_BACKEND_URL` | `https://auth.keyra.ie` (still supported as the proxy upstream if `KEYRA_AUTH_BACKEND_URL` is unset) |
+| `NEXT_PUBLIC_CRM_DEV_AUTH_BYPASS` | `false` when DB + real auth are ready |
+| `KEYRA_AUTH_BACKEND_URL` | `https://auth.keyra.ie` (upstream for `/api/keyra-auth` proxy on `*.keyra.ie`) |
+| `NEXT_PUBLIC_CRM_LOGIN_RETURN_URL` | `https://crm-keyra-production.up.railway.app/login?auth_return=1` until custom domain is live |
+| `NEXT_PUBLIC_KEYRA_GET_STARTED_URL` | `https://get-started.keyra.ie` |
 
-**Important:** `NEXT_PUBLIC_*` variables are embedded at **`npm run build`**. After changing them in Railway, trigger a **new deploy / rebuild**, not only a restart. `KEYRA_AUTH_BACKEND_URL` is server-side, but a redeploy is still recommended so the web service boots with the updated upstream target.
+**Important:** `NEXT_PUBLIC_*` variables are embedded at **`npm run build`**. After changing them in Railway, trigger a **new deploy / rebuild**, not only a restart.
+
+On **Railway** (`*.up.railway.app`), leave `NEXT_PUBLIC_SIMSECURE_AUTH_BACKEND_URL` **unset** so session checks call `auth.keyra.ie` directly. On **`crm.keyra.ie`**, leave it unset too — the app auto-selects the `/api/keyra-auth` same-origin proxy.
 
 ### Railway setup (works with Railway Postgres)
 

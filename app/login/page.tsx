@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { KeyraLogo } from "@/components/brand/keyra-logo";
 import {
@@ -11,6 +11,7 @@ import {
   buildCrmLoginReturnUrl,
   buildKeyraGetStartedLoginUrl,
   fetchSharedKeyraSession,
+  isCrossSiteKeyraHost,
 } from "@/lib/keyra-auth";
 
 function LoginPageContent() {
@@ -20,8 +21,12 @@ function LoginPageContent() {
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  const returnUrl = useMemo(() => buildCrmLoginReturnUrl(), []);
+  const [returnUrl, setReturnUrl] = useState("");
   const isAuthReturn = searchParams.get(CRM_AUTH_RETURN_PARAM) === "1";
+
+  useEffect(() => {
+    setReturnUrl(buildCrmLoginReturnUrl());
+  }, []);
   const loginButtonLabel = isCheckingSession
     ? "Checking session..."
     : isRedirecting
@@ -57,7 +62,9 @@ function LoginPageContent() {
       if (!cancelled) {
         if (isAuthReturn) {
           setFormMessage(
-            "Keyra sign-in finished, but CRM could not confirm the shared session yet. Try again in a moment or use the refresh button below.",
+            isCrossSiteKeyraHost()
+              ? "Keyra sign-in finished, but CRM could not confirm the shared session yet. Click “Continue with Keyra phone login” once more, or allow cookies for auth.keyra.ie in your browser, then retry."
+              : "Keyra sign-in finished, but CRM could not confirm the shared session yet. Try again in a moment or use the refresh button below.",
           );
         }
         setIsCheckingSession(false);

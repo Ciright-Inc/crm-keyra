@@ -1,5 +1,6 @@
 const PROD_AUTH_BACKEND_URL = "https://auth.keyra.ie";
 const PROD_GET_STARTED_URL = "https://get-started.keyra.ie";
+const PROD_RAILWAY_CRM_ORIGIN = "https://crm-keyra-production.up.railway.app";
 const LOCAL_AUTH_BACKEND_URL = "http://localhost:4000";
 const LOCAL_GET_STARTED_URL = "http://localhost:5173";
 const AUTH_PROXY_PATH = "/api/keyra-auth";
@@ -7,6 +8,22 @@ const AUTH_PROXY_PATH = "/api/keyra-auth";
 function isLoopbackHostname(hostname: string) {
   const normalized = hostname.toLowerCase();
   return normalized === "localhost" || normalized === "127.0.0.1";
+}
+
+function isKeyraSubdomainHostname(hostname: string) {
+  const normalized = hostname.toLowerCase();
+  return normalized === "keyra.ie" || normalized.endsWith(".keyra.ie");
+}
+
+function isRailwayAppHostname(hostname: string) {
+  return hostname.toLowerCase().endsWith(".up.railway.app");
+}
+
+/** Hosts outside *.keyra.ie must call auth.keyra.ie directly (cross-site credentialed fetch). */
+export function isCrossSiteKeyraHost(hostname = typeof window !== "undefined" ? window.location.hostname : "") {
+  const normalized = String(hostname ?? "").trim().toLowerCase();
+  if (!normalized || isLoopbackHostname(normalized)) return false;
+  return !isKeyraSubdomainHostname(normalized);
 }
 
 function shouldUseLocalKeyraDefaults() {
@@ -17,6 +34,24 @@ function shouldUseLocalKeyraDefaults() {
   return process.env.NODE_ENV !== "production";
 }
 
+function normalizeConfiguredServiceUrl(raw: string) {
+  const trimmed = raw.trim().replace(/\/$/, "");
+  if (!trimmed) return trimmed;
+
+  if (trimmed.startsWith("/")) {
+    if (typeof window !== "undefined" && window.location?.origin) {
+      return `${window.location.origin}${trimmed === "/" ? "" : trimmed}`;
+    }
+    return trimmed;
+  }
+
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+}
+
 function resolveKeyraServiceUrl(
   envValue: string | undefined,
   productionUrl: string,
@@ -24,10 +59,45 @@ function resolveKeyraServiceUrl(
 ) {
   const trimmed = String(envValue ?? "").trim();
   if (trimmed) {
-    return trimmed;
+    return normalizeConfiguredServiceUrl(trimmed);
   }
 
   return shouldUseLocalKeyraDefaults() ? localUrl : productionUrl;
+}
+
+/**
+ * Client auth API base URL (evaluated in the browser when possible).
+ *
+ * - *.keyra.ie → same-origin `/api/keyra-auth` proxy (session cookie always sent)
+ * - *.up.railway.app → direct `https://auth.keyra.ie` (browser sends `.keyra.ie` cookie cross-site)
+ * - localhost → direct `http://localhost:4000`
+ */
+export function resolveClientAuthBackendUrl(): string {
+  const envConfigured =
+    process.env.NEXT_PUBLIC_KEYRA_AUTH_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_SIMSECURE_AUTH_BACKEND_URL;
+
+  if (envConfigured?.trim()) {
+    return normalizeConfiguredServiceUrl(envConfigured);
+  }
+
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+
+    if (isKeyraSubdomainHostname(hostname)) {
+      return `${window.location.origin}${AUTH_PROXY_PATH}`;
+    }
+
+    if (isRailwayAppHostname(hostname) || isCrossSiteKeyraHost(hostname)) {
+      return PROD_AUTH_BACKEND_URL;
+    }
+
+    if (isLoopbackHostname(hostname)) {
+      return LOCAL_AUTH_BACKEND_URL;
+    }
+  }
+
+  return shouldUseLocalKeyraDefaults() ? LOCAL_AUTH_BACKEND_URL : PROD_AUTH_BACKEND_URL;
 }
 
 export const AUTH_BACKEND_URL = resolveKeyraServiceUrl(
@@ -44,7 +114,19 @@ export const AUTH_BACKEND_TARGET_URL = resolveKeyraServiceUrl(
 );
 
 export const AUTH_BACKEND_PROXY_URL = AUTH_PROXY_PATH;
+
+export function authSessionEndpoint() {
+  return `${resolveClientAuthBackendUrl()}/auth/session`;
+}
+
+export function authLogoutEndpoint() {
+  return `${resolveClientAuthBackendUrl()}/auth/logout`;
+}
+
+/** @deprecated Prefer authSessionEndpoint() — resolved at call time for Railway vs keyra.ie hosts. */
 export const AUTH_SESSION_ENDPOINT = `${AUTH_BACKEND_URL}/auth/session`;
+
+/** @deprecated Prefer authLogoutEndpoint() — resolved at call time for Railway vs keyra.ie hosts. */
 export const AUTH_LOGOUT_ENDPOINT = `${AUTH_BACKEND_URL}/auth/logout`;
 
 export const KEYRA_GET_STARTED_URL = resolveKeyraServiceUrl(
@@ -62,6 +144,9 @@ const AUTH_SESSION_TIMEOUT_MS = 12_000;
 const CRM_LOGIN_RETURN_URL = process.env.NEXT_PUBLIC_CRM_LOGIN_RETURN_URL || "";
 const CRM_POST_AUTH_PATH =
   process.env.NEXT_PUBLIC_CRM_LOGIN_POST_AUTH_PATH || `/login?${CRM_AUTH_RETURN_PARAM}=1`;
+
+/** Live Railway deploy — used until crm.keyra.ie custom domain is attached. */
+export const PROD_RAILWAY_CRM_LOGIN_RETURN_URL = `${PROD_RAILWAY_CRM_ORIGIN}${CRM_POST_AUTH_PATH.startsWith("/") ? CRM_POST_AUTH_PATH : `/${CRM_POST_AUTH_PATH}`}`;
 
 export type AuthSessionUser = {
   id: number;
@@ -198,15 +283,26 @@ export function normalizeAuthSessionResponse(payload: unknown): AuthSessionRespo
 }
 
 export function buildCrmLoginReturnUrl() {
-  if (CRM_LOGIN_RETURN_URL) {
-    return CRM_LOGIN_RETURN_URL;
+  const configured = CRM_LOGIN_RETURN_URL.trim();
+  if (configured) {
+    return configured;
   }
 
-  if (typeof window === "undefined") {
-    return "";
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname.toLowerCase();
+
+    if (isRailwayAppHostname(hostname)) {
+      return PROD_RAILWAY_CRM_LOGIN_RETURN_URL;
+    }
+
+    return new URL(CRM_POST_AUTH_PATH, window.location.origin).toString();
   }
 
-  return new URL(CRM_POST_AUTH_PATH, window.location.origin).toString();
+  if (process.env.NODE_ENV === "production") {
+    return PROD_RAILWAY_CRM_LOGIN_RETURN_URL;
+  }
+
+  return "";
 }
 
 export function buildKeyraGetStartedLoginUrl(returnTo?: string) {
@@ -219,12 +315,34 @@ export function buildKeyraGetStartedLoginUrl(returnTo?: string) {
   return url.toString();
 }
 
+async function ensureCrossSiteCookieAccess() {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return;
+  }
+
+  if (!isCrossSiteKeyraHost(window.location.hostname)) {
+    return;
+  }
+
+  if (typeof document.requestStorageAccess !== "function") {
+    return;
+  }
+
+  try {
+    await document.requestStorageAccess();
+  } catch {
+    // Browser denied or feature unavailable — continue with credentialed fetch.
+  }
+}
+
 export async function fetchSharedKeyraSession() {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), AUTH_SESSION_TIMEOUT_MS);
 
   try {
-    const response = await fetch(AUTH_SESSION_ENDPOINT, {
+    await ensureCrossSiteCookieAccess();
+
+    const response = await fetch(authSessionEndpoint(), {
       method: "GET",
       credentials: "include",
       cache: "no-store",
@@ -270,6 +388,18 @@ export function getAuthUserDisplayLabel(user: AuthSessionUser | null | undefined
   return "Keyra member";
 }
 
+export function getAuthUserInitials(user: AuthSessionUser | null | undefined) {
+  const label = getAuthUserDisplayLabel(user);
+  if (!label || label === "Keyra member") return "K";
+
+  const parts = label.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0]![0] ?? ""}${parts[parts.length - 1]![0] ?? ""}`.toUpperCase();
+  }
+
+  return label.slice(0, 2).toUpperCase();
+}
+
 async function waitForSharedKeyraSessionLogout(timeoutMs: number, retryMs = 250) {
   const deadline = Date.now() + timeoutMs;
 
@@ -294,7 +424,9 @@ export async function logoutSharedKeyraSession(timeoutMs = 4000) {
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    await fetch(AUTH_LOGOUT_ENDPOINT, {
+    await ensureCrossSiteCookieAccess();
+
+    await fetch(authLogoutEndpoint(), {
       method: "POST",
       credentials: "include",
       keepalive: true,

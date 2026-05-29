@@ -16,7 +16,7 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Keyra CRM | crm.keyra.ie",
+  title: "Keyra CRM",
   description:
     "Enterprise relationship intelligence — prospecting, pipeline, revenue, commission, Ciright Core sync",
   icons: {
